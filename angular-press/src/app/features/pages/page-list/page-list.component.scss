@@ -1,0 +1,43 @@
+:host {
+  display: block;
+  padding: 1rem;
+}
+
+.table-actions {
+  margin-bottom: 1rem;
+  display: flex;
+  justify-content: flex-end;
+}
+
+table {
+  width: 100%;
+}
+
+.mat-column-actions {
+  width: 60px;
+  text-align: center;
+}
+
+.mat-column-status {
+  width: 120px;
+}
+
+.mat-column-author {
+  width: 150px;
+}
+
+.mat-column-modifiedDate {
+  width: 150px;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
+mat-progress-bar {
+  margin-bottom: 1rem;
+}

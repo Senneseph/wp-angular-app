@@ -1,0 +1,61 @@
+<mat-card>
+  <mat-card-header>
+    <mat-card-title>Media Library</mat-card-title>
+    <mat-card-subtitle>Manage your media files</mat-card-subtitle>
+  </mat-card-header>
+
+  <mat-card-content>
+    <div class="upload-section">
+      <input
+        type="file"
+        id="fileUpload"
+        multiple
+        (change)="onFileSelected($event)"
+        style="display: none"
+        accept="image/*,video/*,audio/*,.pdf,.doc,.docx">
+      
+      <button mat-raised-button color="primary" (click)="onUploadClick()">
+        <mat-icon>cloud_upload</mat-icon>
+        Upload Media
+      </button>
+    </div>
+
+    <mat-progress-bar *ngIf="loading$ | async" mode="indeterminate"></mat-progress-bar>
+
+    <div class="media-grid">
+      <mat-card *ngFor="let item of media$ | async" class="media-item">
+        <div class="media-preview" [ngSwitch]="getFileType(item.mimeType)">
+          <img *ngSwitchCase="'image'" [src]="item.url" [alt]="item.name">
+          <video *ngSwitchCase="'video'" [src]="item.url" controls></video>
+          <audio *ngSwitchCase="'audio'" [src]="item.url" controls></audio>
+          <mat-icon *ngSwitchDefault>{{ getFileIcon(item.mimeType) }}</mat-icon>
+        </div>
+        
+        <mat-card-content>
+          <h3>{{ item.name }}</h3>
+          <p class="file-meta">
+            {{ item.size | fileSize }}
+            <span class="separator">•</span>
+            {{ item.mimeType }}
+          </p>
+        </mat-card-content>
+
+        <mat-card-actions>
+          <button mat-icon-button [matMenuTriggerFor]="menu" aria-label="Media actions">
+            <mat-icon>more_vert</mat-icon>
+          </button>
+          <mat-menu #menu="matMenu">
+            <button mat-menu-item [cdkCopyToClipboard]="item.url">
+              <mat-icon>content_copy</mat-icon>
+              <span>Copy URL</span>
+            </button>
+            <button mat-menu-item (click)="onDeleteMedia(item.id)">
+              <mat-icon>delete</mat-icon>
+              <span>Delete</span>
+            </button>
+          </mat-menu>
+        </mat-card-actions>
+      </mat-card>
+    </div>
+  </mat-card-content>
+</mat-card>
