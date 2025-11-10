@@ -1,4 +1,4 @@
-import { Page } from '../../../models/page.model';
+import { Page } from '../../models/page.model';
 
 export class LoadPages {
   static readonly type = '[Pages] Load Pages';

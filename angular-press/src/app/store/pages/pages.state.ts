@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { Action, Selector, State, StateContext } from '@ngxs/store';
 import { append, patch, removeItem, updateItem } from '@ngxs/store/operators';
-import { Page } from '../../../models/page.model';
+import { Page } from '../../models/page.model';
 import { CreatePage, DeletePage, LoadPage, LoadPages, SetSelectedPage, UpdatePage } from './page.actions';
 
 export interface PagesStateModel {

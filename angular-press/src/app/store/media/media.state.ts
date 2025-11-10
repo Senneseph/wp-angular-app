@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { Action, Selector, State, StateContext } from '@ngxs/store';
 import { append, patch, removeItem, updateItem } from '@ngxs/store/operators';
-import { MediaItem } from '../../../models/media.model';
+import { MediaItem } from '../../models/media.model';
 import { LoadMedia, LoadMediaItem, UploadMedia, UpdateMedia, DeleteMedia } from './media.actions';
 
 export interface MediaStateModel {
