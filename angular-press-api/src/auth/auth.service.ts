@@ -77,7 +77,12 @@ export class AuthService {
     }
 
     // Generate JWT token
-    const payload = { sub: user.id, username: user.userLogin, email: user.userEmail };
+    const payload = {
+      sub: user.id,
+      username: user.userLogin,
+      email: user.userEmail,
+      requirePasswordChange: user.requirePasswordChange || false
+    };
     const access_token = this.jwtService.sign(payload);
 
     return {
@@ -87,6 +92,7 @@ export class AuthService {
         username: user.userLogin,
         email: user.userEmail,
         displayName: user.displayName,
+        requirePasswordChange: user.requirePasswordChange || false
       }
     };
   }
@@ -101,6 +107,37 @@ export class AuthService {
       username: user.userLogin,
       email: user.userEmail,
       displayName: user.displayName,
+    };
+  }
+
+  async changePassword(userId: number, newPassword: string) {
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    // Hash new password
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    // Update password and clear password change requirement
+    user.userPass = hashedPassword;
+    user.requirePasswordChange = false;
+
+    await this.userRepository.save(user);
+
+    // Generate new JWT token with updated requirePasswordChange flag
+    const payload = {
+      sub: user.id,
+      username: user.userLogin,
+      email: user.userEmail,
+      requirePasswordChange: false
+    };
+    const access_token = this.jwtService.sign(payload);
+
+    return {
+      access_token,
+      message: 'Password changed successfully'
     };
   }
 }

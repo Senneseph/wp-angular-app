@@ -33,6 +33,9 @@ export class User {
   @Column({ name: 'display_name', type: 'varchar', length: 250 })
   displayName: string;
 
+  @Column({ name: 'require_password_change', type: 'boolean', default: false })
+  requirePasswordChange: boolean;
+
   @OneToMany(() => Post, post => post.author)
   posts: Post[];
 }
