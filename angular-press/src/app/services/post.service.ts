@@ -1,91 +1,118 @@
 import { Injectable } from '@angular/core';
-import { BehaviorSubject, Observable } from 'rxjs';
+import { HttpClient, HttpParams } from '@angular/common/http';
+import { BehaviorSubject, Observable, tap } from 'rxjs';
 import { Post } from '../core/models/post.interface';
+import { environment } from '../../environments/environment';
+
+interface PostsResponse {
+  data: Post[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+interface CreatePostDto {
+  title: string;
+  content: string;
+  excerpt?: string;
+  status?: 'draft' | 'published';
+  slug?: string;
+}
+
+interface UpdatePostDto {
+  title?: string;
+  content?: string;
+  excerpt?: string;
+  status?: 'draft' | 'published';
+  slug?: string;
+}
 
 @Injectable({
   providedIn: 'root'
 })
 export class PostService {
-  private posts: Post[] = [
-    {
-      id: '1',
-      title: 'Welcome to Angular Press',
-      content: 'This is a sample post created with Angular Press CMS.',
-      excerpt: 'Sample post introduction',
-      status: 'published',
-      type: 'post',
-      author: 'Admin',
-      publishDate: new Date(),
-      modified: new Date(),
-      slug: 'welcome-to-angular-press',
-      categories: ['1'],
-      tags: ['angular', 'cms'],
-      featured_image: '',
-      meta: {}
-    },
-    {
-      id: '2',
-      title: 'Getting Started Guide',
-      content: 'This guide will help you get started with Angular Press.',
-      excerpt: 'Getting started with Angular Press',
-      status: 'published',
-      type: 'page',
-      author: 'Admin',
-      publishDate: new Date(),
-      modified: new Date(),
-      slug: 'getting-started',
-      categories: ['2'],
-      tags: [],
-      featured_image: '',
-      meta: {}
-    }
-  ];
-
-  private postsSubject = new BehaviorSubject<Post[]>(this.posts);
+  private postsSubject = new BehaviorSubject<Post[]>([]);
   public posts$ = this.postsSubject.asObservable();
 
-  constructor() { }
+  constructor(private http: HttpClient) {
+    // Load initial posts
+    this.loadPosts();
+  }
+
+  private loadPosts(page: number = 1, limit: number = 100): void {
+    let params = new HttpParams()
+      .set('page', page.toString())
+      .set('limit', limit.toString());
+
+    this.http.get<PostsResponse>(`${environment.apiUrl}/posts`, { params })
+      .subscribe(response => {
+        this.postsSubject.next(response.data);
+      });
+  }
 
   getPosts(): Observable<Post[]> {
     return this.posts$;
   }
 
-  getPostById(id: string): Post | undefined {
-    return this.posts.find(post => post.id === id);
+  getPostById(id: string): Observable<Post> {
+    return this.http.get<Post>(`${environment.apiUrl}/posts/${id}`);
   }
 
   createPost(post: Post): Observable<Post> {
-    const newPost = { ...post, id: this.generateId() };
-    this.posts.push(newPost);
-    this.postsSubject.next(this.posts);
-    return new Observable(observer => {
-      observer.next(newPost);
-      observer.complete();
-    });
+    const createDto: CreatePostDto = {
+      title: post.title,
+      content: post.content,
+      excerpt: post.excerpt,
+      status: post.status,
+      slug: post.slug
+    };
+
+    return this.http.post<Post>(`${environment.apiUrl}/posts`, createDto)
+      .pipe(
+        tap(newPost => {
+          // Add to local cache
+          const currentPosts = this.postsSubject.value;
+          this.postsSubject.next([newPost, ...currentPosts]);
+        })
+      );
   }
 
   updatePost(post: Post): Observable<Post> {
-    const index = this.posts.findIndex(p => p.id === post.id);
-    if (index !== -1) {
-      this.posts[index] = post;
-      this.postsSubject.next(this.posts);
-    }
-    return new Observable(observer => {
-      observer.next(post);
-      observer.complete();
-    });
+    const updateDto: UpdatePostDto = {
+      title: post.title,
+      content: post.content,
+      excerpt: post.excerpt,
+      status: post.status,
+      slug: post.slug
+    };
+
+    return this.http.patch<Post>(`${environment.apiUrl}/posts/${post.id}`, updateDto)
+      .pipe(
+        tap(updatedPost => {
+          // Update local cache
+          const currentPosts = this.postsSubject.value;
+          const index = currentPosts.findIndex(p => p.id === post.id);
+          if (index !== -1) {
+            currentPosts[index] = updatedPost;
+            this.postsSubject.next([...currentPosts]);
+          }
+        })
+      );
   }
 
   deletePost(id: string): Observable<void> {
-    this.posts = this.posts.filter(post => post.id !== id);
-    this.postsSubject.next(this.posts);
-    return new Observable(observer => {
-      observer.complete();
-    });
+    return this.http.delete<void>(`${environment.apiUrl}/posts/${id}`)
+      .pipe(
+        tap(() => {
+          // Remove from local cache
+          const currentPosts = this.postsSubject.value;
+          this.postsSubject.next(currentPosts.filter(p => p.id !== id));
+        })
+      );
   }
 
-  private generateId(): string {
-    const maxId = this.posts.length > 0 ? Math.max(...this.posts.map(p => parseInt(p.id) || 0)) : 0;
-    return (maxId + 1).toString();
+  refreshPosts(): void {
+    this.loadPosts();
   }
 }

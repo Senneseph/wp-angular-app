@@ -1,0 +1,78 @@
+<div class="login-container">
+  <div class="login-card">
+    <h1>{{ isRegistering ? 'Register' : 'Login' }} to Angular Press</h1>
+    
+    <form (ngSubmit)="onSubmit()" #loginForm="ngForm">
+      <div class="form-group">
+        <label for="username">Username</label>
+        <input 
+          type="text" 
+          id="username" 
+          name="username"
+          [(ngModel)]="username" 
+          required
+          [disabled]="loading"
+          placeholder="Enter username"
+        />
+      </div>
+
+      <div class="form-group" *ngIf="isRegistering">
+        <label for="email">Email</label>
+        <input 
+          type="email" 
+          id="email" 
+          name="email"
+          [(ngModel)]="email" 
+          [required]="isRegistering"
+          [disabled]="loading"
+          placeholder="Enter email"
+        />
+      </div>
+
+      <div class="form-group" *ngIf="isRegistering">
+        <label for="displayName">Display Name</label>
+        <input 
+          type="text" 
+          id="displayName" 
+          name="displayName"
+          [(ngModel)]="displayName" 
+          [required]="isRegistering"
+          [disabled]="loading"
+          placeholder="Enter display name"
+        />
+      </div>
+
+      <div class="form-group">
+        <label for="password">Password</label>
+        <input 
+          type="password" 
+          id="password" 
+          name="password"
+          [(ngModel)]="password" 
+          required
+          [disabled]="loading"
+          placeholder="Enter password"
+        />
+      </div>
+
+      <div class="error-message" *ngIf="error">
+        {{ error }}
+      </div>
+
+      <button 
+        type="submit" 
+        [disabled]="!loginForm.form.valid || loading"
+        class="btn-primary"
+      >
+        {{ loading ? 'Please wait...' : (isRegistering ? 'Register' : 'Login') }}
+      </button>
+
+      <div class="toggle-mode">
+        <a href="javascript:void(0)" (click)="toggleMode()">
+          {{ isRegistering ? 'Already have an account? Login' : 'Need an account? Register' }}
+        </a>
+      </div>
+    </form>
+  </div>
+</div>
+
