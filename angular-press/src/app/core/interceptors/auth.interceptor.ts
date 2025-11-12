@@ -1,4 +1,5 @@
-import { Injectable } from '@angular/core';
+import { Injectable, PLATFORM_ID, inject } from '@angular/core';
+import { isPlatformBrowser } from '@angular/common';
 import { HttpRequest, HttpHandler, HttpEvent, HttpInterceptor } from '@angular/common/http';
 import { Observable, throwError } from 'rxjs';
 import { catchError } from 'rxjs/operators';
@@ -6,11 +7,15 @@ import { AuthService } from '../auth/auth.service';
 
 @Injectable()
 export class AuthInterceptor implements HttpInterceptor {
-  constructor(private authService: AuthService) {}
+  private isBrowser: boolean;
+
+  constructor(private authService: AuthService) {
+    this.isBrowser = isPlatformBrowser(inject(PLATFORM_ID));
+  }
 
   intercept(request: HttpRequest<any>, next: HttpHandler): Observable<HttpEvent<any>> {
-    // Get the JWT token from localStorage
-    const token = localStorage.getItem('access_token');
+    // Get the JWT token from localStorage (only in browser)
+    const token = this.isBrowser ? localStorage.getItem('access_token') : null;
 
     if (token) {
       request = request.clone({

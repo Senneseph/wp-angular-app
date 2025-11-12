@@ -1,9 +1,10 @@
-import { Injectable } from '@angular/core';
+import { Injectable, PLATFORM_ID, inject } from '@angular/core';
+import { isPlatformBrowser } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { BehaviorSubject, Observable, map } from 'rxjs';
 import { User } from '../models/user.interface';
-import { environment } from '../../../environments/environment';
+import { getApiUrl } from '../utils/api-url.util';
 
 interface LoginResponse {
   access_token: string;
@@ -31,12 +32,16 @@ interface BackendUser {
 export class AuthService {
   private currentUserSubject: BehaviorSubject<User | null>;
   public currentUser$: Observable<User | null>;
+  private isBrowser: boolean;
+  private apiUrl: string;
 
   constructor(
     private http: HttpClient,
     private router: Router
   ) {
-    const storedUser = localStorage.getItem('currentUser');
+    this.isBrowser = isPlatformBrowser(inject(PLATFORM_ID));
+    this.apiUrl = getApiUrl();
+    const storedUser = this.isBrowser ? localStorage.getItem('currentUser') : null;
     this.currentUserSubject = new BehaviorSubject<User | null>(storedUser ? JSON.parse(storedUser) : null);
     this.currentUser$ = this.currentUserSubject.asObservable();
   }
@@ -46,17 +51,21 @@ export class AuthService {
   }
 
   login(username: string, password: string): Observable<User> {
-    return this.http.post<LoginResponse>(`${environment.apiUrl}/auth/login`, { username, password })
+    return this.http.post<LoginResponse>(`${this.apiUrl}/auth/login`, { username, password })
       .pipe(
         map(response => {
           // Store the JWT token
-          localStorage.setItem('access_token', response.access_token);
+          if (this.isBrowser) {
+            localStorage.setItem('access_token', response.access_token);
+          }
 
           // Get user info from token
           const user = this.getCurrentUser();
 
           // Store user in localStorage and update subject
-          localStorage.setItem('currentUser', JSON.stringify(user));
+          if (this.isBrowser) {
+            localStorage.setItem('currentUser', JSON.stringify(user));
+          }
           this.currentUserSubject.next(user);
 
           return user;
@@ -67,17 +76,21 @@ export class AuthService {
   register(username: string, email: string, password: string, displayName: string): Observable<User> {
     const registerDto: RegisterDto = { username, email, password, displayName };
 
-    return this.http.post<LoginResponse>(`${environment.apiUrl}/auth/register`, registerDto)
+    return this.http.post<LoginResponse>(`${this.apiUrl}/auth/register`, registerDto)
       .pipe(
         map(response => {
           // Store the JWT token
-          localStorage.setItem('access_token', response.access_token);
+          if (this.isBrowser) {
+            localStorage.setItem('access_token', response.access_token);
+          }
 
           // Get user info from token
           const user = this.getCurrentUser();
 
           // Store user in localStorage and update subject
-          localStorage.setItem('currentUser', JSON.stringify(user));
+          if (this.isBrowser) {
+            localStorage.setItem('currentUser', JSON.stringify(user));
+          }
           this.currentUserSubject.next(user);
 
           return user;
@@ -88,7 +101,7 @@ export class AuthService {
   getCurrentUser(): User {
     // For now, decode the JWT token to get user info
     // In a real app, you might want to call /auth/me endpoint
-    const token = localStorage.getItem('access_token');
+    const token = this.isBrowser ? localStorage.getItem('access_token') : null;
     if (!token) {
       throw new Error('No token found');
     }
@@ -111,8 +124,10 @@ export class AuthService {
   }
 
   logout(): void {
-    localStorage.removeItem('currentUser');
-    localStorage.removeItem('access_token');
+    if (this.isBrowser) {
+      localStorage.removeItem('currentUser');
+      localStorage.removeItem('access_token');
+    }
     this.currentUserSubject.next(null);
     this.router.navigate(['/ap-admin/login']);
   }
@@ -122,10 +137,14 @@ export class AuthService {
   }
 
   isAuthenticated(): boolean {
-    return !!localStorage.getItem('access_token');
+    return this.isBrowser ? !!localStorage.getItem('access_token') : false;
   }
 
   requiresPasswordChange(): boolean {
+    if (!this.isBrowser) {
+      return false;
+    }
+
     const token = localStorage.getItem('access_token');
     if (!token) {
       return false;

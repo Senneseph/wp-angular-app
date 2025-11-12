@@ -1,9 +1,9 @@
-import { Component } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { Component, PLATFORM_ID, inject } from '@angular/core';
+import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
-import { environment } from '../../../environments/environment';
+import { getApiUrl } from '../../core/utils/api-url.util';
 
 @Component({
   selector: 'app-change-password',
@@ -17,11 +17,16 @@ export class ChangePasswordComponent {
   confirmPassword: string = '';
   error: string = '';
   loading: boolean = false;
+  private isBrowser: boolean;
+  private apiUrl: string;
 
   constructor(
     private http: HttpClient,
     private router: Router
-  ) {}
+  ) {
+    this.isBrowser = isPlatformBrowser(inject(PLATFORM_ID));
+    this.apiUrl = getApiUrl();
+  }
 
   onSubmit(): void {
     this.error = '';
@@ -45,13 +50,15 @@ export class ChangePasswordComponent {
     this.loading = true;
 
     this.http.post<{ access_token: string; message: string }>(
-      `${environment.apiUrl}/auth/change-password`,
+      `${this.apiUrl}/auth/change-password`,
       { newPassword: this.newPassword }
     ).subscribe({
       next: (response) => {
         // Update the token in localStorage
-        localStorage.setItem('access_token', response.access_token);
-        
+        if (this.isBrowser) {
+          localStorage.setItem('access_token', response.access_token);
+        }
+
         // Redirect to dashboard
         this.router.navigate(['/ap-admin/dashboard']);
       },

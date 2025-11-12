@@ -2,7 +2,7 @@ import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { BehaviorSubject, Observable, tap } from 'rxjs';
 import { Post } from '../core/models/post.interface';
-import { environment } from '../../environments/environment';
+import { getApiUrl } from '../core/utils/api-url.util';
 
 interface PostsResponse {
   data: Post[];
@@ -34,8 +34,10 @@ interface UpdatePostDto {
 export class PostService {
   private postsSubject = new BehaviorSubject<Post[]>([]);
   public posts$ = this.postsSubject.asObservable();
+  private apiUrl: string;
 
   constructor(private http: HttpClient) {
+    this.apiUrl = getApiUrl();
     // Load initial posts
     this.loadPosts();
   }
@@ -45,7 +47,7 @@ export class PostService {
       .set('page', page.toString())
       .set('limit', limit.toString());
 
-    this.http.get<PostsResponse>(`${environment.apiUrl}/posts`, { params })
+    this.http.get<PostsResponse>(`${this.apiUrl}/posts`, { params })
       .subscribe(response => {
         this.postsSubject.next(response.data);
       });
@@ -56,7 +58,7 @@ export class PostService {
   }
 
   getPostById(id: string): Observable<Post> {
-    return this.http.get<Post>(`${environment.apiUrl}/posts/${id}`);
+    return this.http.get<Post>(`${this.apiUrl}/posts/${id}`);
   }
 
   createPost(post: Post): Observable<Post> {
@@ -68,7 +70,7 @@ export class PostService {
       slug: post.slug
     };
 
-    return this.http.post<Post>(`${environment.apiUrl}/posts`, createDto)
+    return this.http.post<Post>(`${this.apiUrl}/posts`, createDto)
       .pipe(
         tap(newPost => {
           // Add to local cache
@@ -87,7 +89,7 @@ export class PostService {
       slug: post.slug
     };
 
-    return this.http.patch<Post>(`${environment.apiUrl}/posts/${post.id}`, updateDto)
+    return this.http.patch<Post>(`${this.apiUrl}/posts/${post.id}`, updateDto)
       .pipe(
         tap(updatedPost => {
           // Update local cache
@@ -102,7 +104,7 @@ export class PostService {
   }
 
   deletePost(id: string): Observable<void> {
-    return this.http.delete<void>(`${environment.apiUrl}/posts/${id}`)
+    return this.http.delete<void>(`${this.apiUrl}/posts/${id}`)
       .pipe(
         tap(() => {
           // Remove from local cache
