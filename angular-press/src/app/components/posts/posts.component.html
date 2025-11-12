@@ -5,6 +5,7 @@
     <a routerLink="/ap-admin/posts/new" class="page-title-action">Add New</a>
 
     <!-- Filter Tabs -->
+    <div>
     <ul class="subsubsub">
       <li class="all">
         <a [class.current]="selectedFilter === 'all'" (click)="onFilterChange('all')">
@@ -27,6 +28,7 @@
         </a>
       </li>
     </ul>
+
 
     <!-- Search and Filters -->
     <div class="tablenav top">
@@ -130,6 +132,7 @@
       <div class="tablenav-pages">
         <span class="displaying-num">{{ filteredPosts.length }} items</span>
       </div>
+    </div>
     </div>
   </div>
 </div>
