@@ -5,6 +5,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
 import { PostsModule } from './posts/posts.module';
+import { PagesModule } from './pages/pages.module';
 import { User } from './entities/user.entity';
 import { Post } from './entities/post.entity';
 import { Term } from './entities/term.entity';
@@ -32,6 +33,7 @@ import { TermTaxonomy } from './entities/term-taxonomy.entity';
     }),
     AuthModule,
     PostsModule,
+    PagesModule,
   ],
   controllers: [AppController],
   providers: [AppService],
