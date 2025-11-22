@@ -1,72 +1,72 @@
 import { Injectable } from '@angular/core';
-import { BehaviorSubject, Observable } from 'rxjs';
+import { HttpClient, HttpParams } from '@angular/common/http';
+import { BehaviorSubject, Observable, tap } from 'rxjs';
 import { Tag } from '../models/tag.model';
+import { getApiUrl } from '../core/utils/api-url.util';
+
+interface TagsResponse {
+  data: Tag[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
 
 @Injectable({
   providedIn: 'root'
 })
 export class TagService {
-  private tags: Tag[] = [
-    {
-      id: 1,
-      name: 'angular',
-      slug: 'angular',
-      description: 'Angular framework posts',
-      count: 1
-    },
-    {
-      id: 2,
-      name: 'cms',
-      slug: 'cms',
-      description: 'Content management system posts',
-      count: 1
-    }
-  ];
-
-  private tagsSubject = new BehaviorSubject<Tag[]>(this.tags);
+  private tagsSubject = new BehaviorSubject<Tag[]>([]);
   public tags$ = this.tagsSubject.asObservable();
+  private apiUrl: string;
 
-  constructor() { }
+  constructor(private http: HttpClient) {
+    this.apiUrl = getApiUrl();
+    this.loadTags();
+  }
+
+  private loadTags(page: number = 1, limit: number = 100): void {
+    let params = new HttpParams()
+      .set('page', page.toString())
+      .set('limit', limit.toString());
+
+    this.http.get<TagsResponse>(`${this.apiUrl}/tags`, { params })
+      .subscribe(response => {
+        this.tagsSubject.next(response.data);
+      });
+  }
 
   getTags(): Observable<Tag[]> {
     return this.tags$;
   }
 
-  getTagById(id: number): Tag | undefined {
-    return this.tags.find(tag => tag.id === id);
+  getTagById(id: number): Observable<Tag> {
+    return this.http.get<Tag>(`${this.apiUrl}/tags/${id}`);
   }
 
-  createTag(tag: Tag): Observable<Tag> {
-    const newTag = { ...tag, id: this.generateId() };
-    this.tags.push(newTag);
-    this.tagsSubject.next(this.tags);
-    return new Observable(observer => {
-      observer.next(newTag);
-      observer.complete();
-    });
+  createTag(tag: Partial<Tag>): Observable<Tag> {
+    return this.http.post<Tag>(`${this.apiUrl}/tags`, {
+      name: tag.name,
+      slug: tag.slug,
+      description: tag.description
+    }).pipe(
+      tap(() => this.loadTags())
+    );
   }
 
-  updateTag(tag: Tag): Observable<Tag> {
-    const index = this.tags.findIndex(t => t.id === tag.id);
-    if (index !== -1) {
-      this.tags[index] = tag;
-      this.tagsSubject.next(this.tags);
-    }
-    return new Observable(observer => {
-      observer.next(tag);
-      observer.complete();
-    });
+  updateTag(id: number, tag: Partial<Tag>): Observable<Tag> {
+    return this.http.patch<Tag>(`${this.apiUrl}/tags/${id}`, {
+      name: tag.name,
+      slug: tag.slug,
+      description: tag.description
+    }).pipe(
+      tap(() => this.loadTags())
+    );
   }
 
-  deleteTag(id: number): Observable<void> {
-    this.tags = this.tags.filter(tag => tag.id !== id);
-    this.tagsSubject.next(this.tags);
-    return new Observable(observer => {
-      observer.complete();
-    });
-  }
-
-  private generateId(): number {
-    return this.tags.length > 0 ? Math.max(...this.tags.map(t => t.id || 0)) + 1 : 1;
+  deleteTag(id: number): Observable<{ message: string }> {
+    return this.http.delete<{ message: string }>(`${this.apiUrl}/tags/${id}`).pipe(
+      tap(() => this.loadTags())
+    );
   }
 }

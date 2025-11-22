@@ -1,72 +1,74 @@
 import { Injectable } from '@angular/core';
-import { BehaviorSubject, Observable } from 'rxjs';
+import { HttpClient, HttpParams } from '@angular/common/http';
+import { BehaviorSubject, Observable, tap } from 'rxjs';
 import { Category } from '../models/category.model';
+import { getApiUrl } from '../core/utils/api-url.util';
+
+interface CategoriesResponse {
+  data: Category[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
 
 @Injectable({
   providedIn: 'root'
 })
 export class CategoryService {
-  private categories: Category[] = [
-    {
-      id: 1,
-      name: 'Technology',
-      slug: 'technology',
-      description: 'Posts about technology',
-      count: 1
-    },
-    {
-      id: 2,
-      name: 'Guides',
-      slug: 'guides',
-      description: 'Helpful guides',
-      count: 1
-    }
-  ];
-
-  private categoriesSubject = new BehaviorSubject<Category[]>(this.categories);
+  private categoriesSubject = new BehaviorSubject<Category[]>([]);
   public categories$ = this.categoriesSubject.asObservable();
+  private apiUrl: string;
 
-  constructor() { }
+  constructor(private http: HttpClient) {
+    this.apiUrl = getApiUrl();
+    this.loadCategories();
+  }
+
+  private loadCategories(page: number = 1, limit: number = 100): void {
+    let params = new HttpParams()
+      .set('page', page.toString())
+      .set('limit', limit.toString());
+
+    this.http.get<CategoriesResponse>(`${this.apiUrl}/categories`, { params })
+      .subscribe(response => {
+        this.categoriesSubject.next(response.data);
+      });
+  }
 
   getCategories(): Observable<Category[]> {
     return this.categories$;
   }
 
-  getCategoryById(id: number): Category | undefined {
-    return this.categories.find(category => category.id === id);
+  getCategoryById(id: number): Observable<Category> {
+    return this.http.get<Category>(`${this.apiUrl}/categories/${id}`);
   }
 
-  createCategory(category: Category): Observable<Category> {
-    const newCategory = { ...category, id: this.generateId() };
-    this.categories.push(newCategory);
-    this.categoriesSubject.next(this.categories);
-    return new Observable(observer => {
-      observer.next(newCategory);
-      observer.complete();
-    });
+  createCategory(category: Partial<Category>): Observable<Category> {
+    return this.http.post<Category>(`${this.apiUrl}/categories`, {
+      name: category.name,
+      slug: category.slug,
+      description: category.description,
+      parentId: category.parentId || 0
+    }).pipe(
+      tap(() => this.loadCategories())
+    );
   }
 
-  updateCategory(category: Category): Observable<Category> {
-    const index = this.categories.findIndex(c => c.id === category.id);
-    if (index !== -1) {
-      this.categories[index] = category;
-      this.categoriesSubject.next(this.categories);
-    }
-    return new Observable(observer => {
-      observer.next(category);
-      observer.complete();
-    });
+  updateCategory(id: number, category: Partial<Category>): Observable<Category> {
+    return this.http.patch<Category>(`${this.apiUrl}/categories/${id}`, {
+      name: category.name,
+      slug: category.slug,
+      description: category.description,
+      parentId: category.parentId
+    }).pipe(
+      tap(() => this.loadCategories())
+    );
   }
 
-  deleteCategory(id: number): Observable<void> {
-    this.categories = this.categories.filter(category => category.id !== id);
-    this.categoriesSubject.next(this.categories);
-    return new Observable(observer => {
-      observer.complete();
-    });
-  }
-
-  private generateId(): number {
-    return this.categories.length > 0 ? Math.max(...this.categories.map(c => c.id || 0)) + 1 : 1;
+  deleteCategory(id: number): Observable<{ message: string }> {
+    return this.http.delete<{ message: string }>(`${this.apiUrl}/categories/${id}`).pipe(
+      tap(() => this.loadCategories())
+    );
   }
 }
