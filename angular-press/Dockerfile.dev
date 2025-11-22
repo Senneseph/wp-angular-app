@@ -3,6 +3,19 @@ FROM node:22.12.0-alpine
 
 WORKDIR /app
 
+# Install Chromium and dependencies for testing
+RUN apk add --no-cache \
+    chromium \
+    nss \
+    freetype \
+    harfbuzz \
+    ca-certificates \
+    ttf-freefont
+
+# Set environment variable for Chrome binary
+ENV CHROME_BIN=/usr/bin/chromium-browser \
+    PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
+
 # Copy package files
 COPY package*.json ./
 
