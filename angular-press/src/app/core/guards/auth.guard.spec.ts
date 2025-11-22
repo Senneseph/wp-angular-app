@@ -1,11 +1,10 @@
 import { TestBed } from '@angular/core/testing';
 import { Router, ActivatedRouteSnapshot, RouterStateSnapshot } from '@angular/router';
-import { AuthGuard } from './auth.guard';
+import { authGuard } from './auth.guard';
 import { AuthService } from '../auth/auth.service';
 import { User } from '../models/user.interface';
 
-describe('AuthGuard', () => {
-  let guard: AuthGuard;
+describe('authGuard', () => {
   let authServiceSpy: jasmine.SpyObj<AuthService>;
   let routerSpy: jasmine.SpyObj<Router>;
   let mockRoute: ActivatedRouteSnapshot;
@@ -19,13 +18,11 @@ describe('AuthGuard', () => {
 
     TestBed.configureTestingModule({
       providers: [
-        AuthGuard,
         { provide: AuthService, useValue: authSpy },
         { provide: Router, useValue: routSpy }
       ]
     });
 
-    guard = TestBed.inject(AuthGuard);
     authServiceSpy = TestBed.inject(AuthService) as jasmine.SpyObj<AuthService>;
     routerSpy = TestBed.inject(Router) as jasmine.SpyObj<Router>;
 
@@ -39,7 +36,7 @@ describe('AuthGuard', () => {
   });
 
   it('should be created', () => {
-    expect(guard).toBeTruthy();
+    expect(authGuard).toBeTruthy();
   });
 
   describe('canActivate', () => {
@@ -52,23 +49,29 @@ describe('AuthGuard', () => {
       });
 
       it('should return false', () => {
-        const result = guard.canActivate(mockRoute, mockState);
+        const result = TestBed.runInInjectionContext(() =>
+          authGuard(mockRoute, mockState)
+        );
         expect(result).toBe(false);
       });
 
       it('should navigate to login page', () => {
-        guard.canActivate(mockRoute, mockState);
+        TestBed.runInInjectionContext(() =>
+          authGuard(mockRoute, mockState)
+        );
         expect(routerSpy.navigate).toHaveBeenCalledWith(
-          ['/login'],
+          ['/ap-admin/login'],
           { queryParams: { returnUrl: '/test-url' } }
         );
       });
 
       it('should include return URL in query params', () => {
         mockState.url = '/admin/posts';
-        guard.canActivate(mockRoute, mockState);
+        TestBed.runInInjectionContext(() =>
+          authGuard(mockRoute, mockState)
+        );
         expect(routerSpy.navigate).toHaveBeenCalledWith(
-          ['/login'],
+          ['/ap-admin/login'],
           { queryParams: { returnUrl: '/admin/posts' } }
         );
       });
@@ -98,12 +101,16 @@ describe('AuthGuard', () => {
       });
 
       it('should return true when no capability is required', () => {
-        const result = guard.canActivate(mockRoute, mockState);
+        const result = TestBed.runInInjectionContext(() =>
+          authGuard(mockRoute, mockState)
+        );
         expect(result).toBe(true);
       });
 
       it('should not navigate when access is granted', () => {
-        guard.canActivate(mockRoute, mockState);
+        TestBed.runInInjectionContext(() =>
+          authGuard(mockRoute, mockState)
+        );
         expect(routerSpy.navigate).not.toHaveBeenCalled();
       });
 
@@ -112,7 +119,9 @@ describe('AuthGuard', () => {
           mockRoute.data = { capability: 'edit_posts' };
           authServiceSpy.hasCapability.and.returnValue(true);
 
-          const result = guard.canActivate(mockRoute, mockState);
+          const result = TestBed.runInInjectionContext(() =>
+            authGuard(mockRoute, mockState)
+          );
           expect(result).toBe(true);
         });
 
@@ -120,7 +129,9 @@ describe('AuthGuard', () => {
           mockRoute.data = { capability: 'manage_options' };
           authServiceSpy.hasCapability.and.returnValue(true);
 
-          guard.canActivate(mockRoute, mockState);
+          TestBed.runInInjectionContext(() =>
+            authGuard(mockRoute, mockState)
+          );
           expect(authServiceSpy.hasCapability).toHaveBeenCalledWith('manage_options');
         });
 
@@ -128,7 +139,9 @@ describe('AuthGuard', () => {
           mockRoute.data = { capability: 'delete_users' };
           authServiceSpy.hasCapability.and.returnValue(false);
 
-          const result = guard.canActivate(mockRoute, mockState);
+          const result = TestBed.runInInjectionContext(() =>
+            authGuard(mockRoute, mockState)
+          );
           expect(result).toBe(false);
         });
 
@@ -136,18 +149,26 @@ describe('AuthGuard', () => {
           mockRoute.data = { capability: 'delete_users' };
           authServiceSpy.hasCapability.and.returnValue(false);
 
-          guard.canActivate(mockRoute, mockState);
-          expect(routerSpy.navigate).toHaveBeenCalledWith(['/dashboard']);
+          TestBed.runInInjectionContext(() =>
+            authGuard(mockRoute, mockState)
+          );
+          expect(routerSpy.navigate).toHaveBeenCalledWith(['/ap-admin']);
         });
 
         it('should handle multiple capability checks', () => {
           mockRoute.data = { capability: 'edit_posts' };
           authServiceSpy.hasCapability.and.returnValue(true);
-          expect(guard.canActivate(mockRoute, mockState)).toBe(true);
+          const result1 = TestBed.runInInjectionContext(() =>
+            authGuard(mockRoute, mockState)
+          );
+          expect(result1).toBe(true);
 
           mockRoute.data = { capability: 'delete_posts' };
           authServiceSpy.hasCapability.and.returnValue(false);
-          expect(guard.canActivate(mockRoute, mockState)).toBe(false);
+          const result2 = TestBed.runInInjectionContext(() =>
+            authGuard(mockRoute, mockState)
+          );
+          expect(result2).toBe(false);
         });
       });
     });
