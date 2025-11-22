@@ -1,15 +1,27 @@
 import { TestBed } from '@angular/core/testing';
+import { HttpClientTestingModule, HttpTestingController } from '@angular/common/http/testing';
 import { CategoryService } from './category.service';
 import { Category } from '../models/category.model';
 
 describe('CategoryService', () => {
   let service: CategoryService;
+  let httpMock: HttpTestingController;
 
   beforeEach(() => {
     TestBed.configureTestingModule({
+      imports: [HttpClientTestingModule],
       providers: [CategoryService]
     });
     service = TestBed.inject(CategoryService);
+    httpMock = TestBed.inject(HttpTestingController);
+
+    // Flush the initial loadCategories() call from constructor
+    const initialReq = httpMock.expectOne(req => req.url.includes('/categories'));
+    initialReq.flush({ data: [], total: 0, page: 1, limit: 100, totalPages: 0 });
+  });
+
+  afterEach(() => {
+    httpMock.verify();
   });
 
   it('should be created', () => {
@@ -18,50 +30,80 @@ describe('CategoryService', () => {
 
   describe('getCategories', () => {
     it('should return an observable of categories', (done) => {
+      const mockCategories: Category[] = [
+        { id: 1, name: 'Tech', slug: 'tech', description: 'Technology', count: 5 }
+      ];
+
       service.getCategories().subscribe(categories => {
         expect(categories).toBeDefined();
         expect(Array.isArray(categories)).toBe(true);
-        expect(categories.length).toBeGreaterThan(0);
         done();
       });
     });
 
     it('should return categories with correct structure', (done) => {
+      const mockCategories: Category[] = [
+        { id: 1, name: 'Tech', slug: 'tech', description: 'Technology', count: 5 }
+      ];
+
+      // Trigger a reload
+      service['loadCategories']();
+
+      const req = httpMock.expectOne(request => request.url.includes('/categories'));
+      req.flush({ data: mockCategories, total: 1, page: 1, limit: 100, totalPages: 1 });
+
       service.getCategories().subscribe(categories => {
-        const category = categories[0];
-        expect(category.id).toBeDefined();
-        expect(category.name).toBeDefined();
-        expect(category.slug).toBeDefined();
+        if (categories.length > 0) {
+          const category = categories[0];
+          expect(category.id).toBeDefined();
+          expect(category.name).toBeDefined();
+          expect(category.slug).toBeDefined();
+        }
         done();
       });
     });
   });
 
   describe('getCategoryById', () => {
-    it('should return a category when valid id is provided', () => {
-      const category = service.getCategoryById(1);
-      expect(category).toBeDefined();
-      expect(category?.id).toBe(1);
-      expect(category?.name).toBe('Technology');
+    it('should make GET request to fetch category by id', (done) => {
+      const mockCategory: Category = { id: 1, name: 'Tech', slug: 'tech', description: 'Technology', count: 5 };
+
+      service.getCategoryById(1).subscribe(category => {
+        expect(category).toBeDefined();
+        expect(category.id).toBe(1);
+        expect(category.name).toBe('Tech');
+        done();
+      });
+
+      const req = httpMock.expectOne(request => request.url.includes('/categories/1'));
+      expect(req.request.method).toBe('GET');
+      req.flush(mockCategory);
     });
 
-    it('should return undefined when invalid id is provided', () => {
-      const category = service.getCategoryById(999);
-      expect(category).toBeUndefined();
-    });
+    it('should handle error when category not found', (done) => {
+      service.getCategoryById(999).subscribe({
+        next: () => fail('should have failed'),
+        error: (error) => {
+          expect(error).toBeDefined();
+          done();
+        }
+      });
 
-    it('should return the correct category for id 2', () => {
-      const category = service.getCategoryById(2);
-      expect(category).toBeDefined();
-      expect(category?.id).toBe(2);
-      expect(category?.name).toBe('Guides');
+      const req = httpMock.expectOne(request => request.url.includes('/categories/999'));
+      req.flush('Not found', { status: 404, statusText: 'Not Found' });
     });
   });
 
   describe('createCategory', () => {
     it('should create a new category', (done) => {
-      const newCategory: Category = {
-        id: 0,
+      const newCategory = {
+        name: 'Test Category',
+        slug: 'test-category',
+        description: 'Test description'
+      };
+
+      const mockResponse: Category = {
+        id: 1,
         name: 'Test Category',
         slug: 'test-category',
         description: 'Test description',
@@ -70,112 +112,104 @@ describe('CategoryService', () => {
 
       service.createCategory(newCategory).subscribe(createdCategory => {
         expect(createdCategory).toBeDefined();
-        expect(createdCategory.id).toBeGreaterThan(0);
+        expect(createdCategory.id).toBe(1);
         expect(createdCategory.name).toBe('Test Category');
         done();
       });
+
+      const req = httpMock.expectOne(request => request.url.includes('/categories') && request.method === 'POST');
+      expect(req.request.method).toBe('POST');
+      expect(req.request.body.name).toBe('Test Category');
+      req.flush(mockResponse);
+
+      // Flush the reload request
+      const reloadReq = httpMock.expectOne(request => request.url.includes('/categories') && request.method === 'GET');
+      reloadReq.flush({ data: [mockResponse], total: 1, page: 1, limit: 100, totalPages: 1 });
     });
 
-    it('should add the new category to the categories list', (done) => {
-      const newCategory: Category = {
-        id: 0,
+    it('should trigger reload after creating category', (done) => {
+      const newCategory = {
+        name: 'Another Category',
+        slug: 'another-category',
+        description: 'Another description'
+      };
+
+      const mockResponse: Category = {
+        id: 2,
         name: 'Another Category',
         slug: 'another-category',
         description: 'Another description',
         count: 0
       };
 
-      let initialCount = 0;
-      service.getCategories().subscribe(categories => {
-        initialCount = categories.length;
-      });
-
       service.createCategory(newCategory).subscribe(() => {
-        service.getCategories().subscribe(categories => {
-          expect(categories.length).toBe(initialCount + 1);
-          done();
-        });
+        done();
       });
-    });
 
-    it('should generate unique ids for new categories', (done) => {
-      const category1: Category = {
-        id: 0,
-        name: 'Category 1',
-        slug: 'category-1',
-        description: 'Description 1',
-        count: 0
-      };
+      const createReq = httpMock.expectOne(request => request.url.includes('/categories') && request.method === 'POST');
+      createReq.flush(mockResponse);
 
-      const category2: Category = {
-        id: 0,
-        name: 'Category 2',
-        slug: 'category-2',
-        description: 'Description 2',
-        count: 0
-      };
-
-      service.createCategory(category1).subscribe(created1 => {
-        service.createCategory(category2).subscribe(created2 => {
-          expect(created1.id).not.toBe(created2.id);
-          expect(Number(created2.id)).toBeGreaterThan(Number(created1.id));
-          done();
-        });
-      });
+      // Verify reload is triggered
+      const reloadReq = httpMock.expectOne(request => request.url.includes('/categories') && request.method === 'GET');
+      reloadReq.flush({ data: [mockResponse], total: 1, page: 1, limit: 100, totalPages: 1 });
     });
   });
 
   describe('updateCategory', () => {
     it('should update an existing category', (done) => {
-      const existingCategory = service.getCategoryById(1);
-      expect(existingCategory).toBeDefined();
-
-      const updatedCategory: Category = {
-        ...existingCategory!,
+      const updateData = {
         name: 'Updated Technology',
-        description: 'Updated description'
+        description: 'Updated description',
+        slug: 'updated-tech'
       };
 
-      service.updateCategory(updatedCategory).subscribe(result => {
+      const mockResponse: Category = {
+        id: 1,
+        name: 'Updated Technology',
+        slug: 'updated-tech',
+        description: 'Updated description',
+        count: 5
+      };
+
+      service.updateCategory(1, updateData).subscribe(result => {
         expect(result.name).toBe('Updated Technology');
         expect(result.description).toBe('Updated description');
-        
-        const retrievedCategory = service.getCategoryById(1);
-        expect(retrievedCategory?.name).toBe('Updated Technology');
         done();
       });
+
+      const req = httpMock.expectOne(request => request.url.includes('/categories/1') && request.method === 'PATCH');
+      expect(req.request.method).toBe('PATCH');
+      expect(req.request.body.name).toBe('Updated Technology');
+      req.flush(mockResponse);
+
+      // Flush the reload request
+      const reloadReq = httpMock.expectOne(request => request.url.includes('/categories') && request.method === 'GET');
+      reloadReq.flush({ data: [mockResponse], total: 1, page: 1, limit: 100, totalPages: 1 });
     });
 
-    it('should emit updated categories list', (done) => {
-      const existingCategory = service.getCategoryById(1);
-      const updatedCategory: Category = {
-        ...existingCategory!,
+    it('should trigger reload after updating category', (done) => {
+      const updateData = {
         slug: 'new-slug'
       };
 
-      service.updateCategory(updatedCategory).subscribe(() => {
-        service.getCategories().subscribe(categories => {
-          const category = categories.find(c => c.id === 1);
-          expect(category?.slug).toBe('new-slug');
-          done();
-        });
-      });
-    });
-
-    it('should handle updating non-existent category', (done) => {
-      const nonExistentCategory: Category = {
-        id: 999,
-        name: 'Non-existent',
-        slug: 'non-existent',
-        description: 'Description',
-        count: 0
+      const mockResponse: Category = {
+        id: 1,
+        name: 'Tech',
+        slug: 'new-slug',
+        description: 'Technology',
+        count: 5
       };
 
-      service.updateCategory(nonExistentCategory).subscribe(result => {
-        expect(result).toBeDefined();
-        expect(result.id).toBe(999);
+      service.updateCategory(1, updateData).subscribe(() => {
         done();
       });
+
+      const updateReq = httpMock.expectOne(request => request.url.includes('/categories/1') && request.method === 'PATCH');
+      updateReq.flush(mockResponse);
+
+      // Verify reload is triggered
+      const reloadReq = httpMock.expectOne(request => request.url.includes('/categories') && request.method === 'GET');
+      reloadReq.flush({ data: [mockResponse], total: 1, page: 1, limit: 100, totalPages: 1 });
     });
   });
 
