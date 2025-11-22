@@ -23,4 +23,3 @@ export class CreatePageDto {
   @IsNumber()
   parentId?: number;
 }
-

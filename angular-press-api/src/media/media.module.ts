@@ -1,12 +1,13 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { PagesService } from './pages.service';
-import { PagesController } from './pages.controller';
+import { MediaService } from './media.service';
+import { MediaController } from './media.controller';
 import { Post } from '../entities/post.entity';
 
 @Module({
   imports: [TypeOrmModule.forFeature([Post])],
-  controllers: [PagesController],
-  providers: [PagesService],
+  controllers: [MediaController],
+  providers: [MediaService],
 })
-export class PagesModule {}
+export class MediaModule {}
+

@@ -40,4 +40,3 @@ export class PagesController {
     return this.pagesService.remove(+id);
   }
 }
-
