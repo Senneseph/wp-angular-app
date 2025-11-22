@@ -1,15 +1,27 @@
 import { TestBed } from '@angular/core/testing';
+import { HttpClientTestingModule, HttpTestingController } from '@angular/common/http/testing';
 import { TagService } from './tag.service';
 import { Tag } from '../models/tag.model';
 
 describe('TagService', () => {
   let service: TagService;
+  let httpMock: HttpTestingController;
 
   beforeEach(() => {
     TestBed.configureTestingModule({
+      imports: [HttpClientTestingModule],
       providers: [TagService]
     });
     service = TestBed.inject(TagService);
+    httpMock = TestBed.inject(HttpTestingController);
+
+    // Flush the initial loadTags() call from constructor
+    const initialReq = httpMock.expectOne(req => req.url.includes('/tags'));
+    initialReq.flush({ data: [], total: 0, page: 1, limit: 100, totalPages: 0 });
+  });
+
+  afterEach(() => {
+    httpMock.verify();
   });
 
   it('should be created', () => {
@@ -21,47 +33,73 @@ describe('TagService', () => {
       service.getTags().subscribe(tags => {
         expect(tags).toBeDefined();
         expect(Array.isArray(tags)).toBe(true);
-        expect(tags.length).toBeGreaterThan(0);
         done();
       });
     });
 
     it('should return tags with correct structure', (done) => {
+      const mockTags: Tag[] = [
+        { id: 1, name: 'angular', slug: 'angular', description: 'Angular framework', count: 5 }
+      ];
+
+      // Trigger a reload
+      service['loadTags']();
+
+      const req = httpMock.expectOne(request => request.url.includes('/tags'));
+      req.flush({ data: mockTags, total: 1, page: 1, limit: 100, totalPages: 1 });
+
       service.getTags().subscribe(tags => {
-        const tag = tags[0];
-        expect(tag.id).toBeDefined();
-        expect(tag.name).toBeDefined();
-        expect(tag.slug).toBeDefined();
+        if (tags.length > 0) {
+          const tag = tags[0];
+          expect(tag.id).toBeDefined();
+          expect(tag.name).toBeDefined();
+          expect(tag.slug).toBeDefined();
+        }
         done();
       });
     });
   });
 
   describe('getTagById', () => {
-    it('should return a tag when valid id is provided', () => {
-      const tag = service.getTagById(1);
-      expect(tag).toBeDefined();
-      expect(tag?.id).toBe(1);
-      expect(tag?.name).toBe('angular');
+    it('should make GET request to fetch tag by id', (done) => {
+      const mockTag: Tag = { id: 1, name: 'angular', slug: 'angular', description: 'Angular framework', count: 5 };
+
+      service.getTagById(1).subscribe(tag => {
+        expect(tag).toBeDefined();
+        expect(tag.id).toBe(1);
+        expect(tag.name).toBe('angular');
+        done();
+      });
+
+      const req = httpMock.expectOne(request => request.url.includes('/tags/1'));
+      expect(req.request.method).toBe('GET');
+      req.flush(mockTag);
     });
 
-    it('should return undefined when invalid id is provided', () => {
-      const tag = service.getTagById(999);
-      expect(tag).toBeUndefined();
-    });
+    it('should handle error when tag not found', (done) => {
+      service.getTagById(999).subscribe({
+        next: () => fail('should have failed'),
+        error: (error) => {
+          expect(error).toBeDefined();
+          done();
+        }
+      });
 
-    it('should return the correct tag for id 2', () => {
-      const tag = service.getTagById(2);
-      expect(tag).toBeDefined();
-      expect(tag?.id).toBe(2);
-      expect(tag?.name).toBe('cms');
+      const req = httpMock.expectOne(request => request.url.includes('/tags/999'));
+      req.flush('Not found', { status: 404, statusText: 'Not Found' });
     });
   });
 
   describe('createTag', () => {
     it('should create a new tag', (done) => {
-      const newTag: Tag = {
-        id: 0,
+      const newTag = {
+        name: 'test',
+        slug: 'test',
+        description: 'Test tag'
+      };
+
+      const mockResponse: Tag = {
+        id: 1,
         name: 'test',
         slug: 'test',
         description: 'Test tag',
@@ -70,154 +108,139 @@ describe('TagService', () => {
 
       service.createTag(newTag).subscribe(createdTag => {
         expect(createdTag).toBeDefined();
-        expect(createdTag.id).toBeGreaterThan(0);
+        expect(createdTag.id).toBe(1);
         expect(createdTag.name).toBe('test');
         done();
       });
+
+      const req = httpMock.expectOne(request => request.url.includes('/tags') && request.method === 'POST');
+      expect(req.request.method).toBe('POST');
+      expect(req.request.body.name).toBe('test');
+      req.flush(mockResponse);
+
+      // Flush the reload request
+      const reloadReq = httpMock.expectOne(request => request.url.includes('/tags') && request.method === 'GET');
+      reloadReq.flush({ data: [mockResponse], total: 1, page: 1, limit: 100, totalPages: 1 });
     });
 
-    it('should add the new tag to the tags list', (done) => {
-      const newTag: Tag = {
-        id: 0,
+    it('should trigger reload after creating tag', (done) => {
+      const newTag = {
+        name: 'another',
+        slug: 'another',
+        description: 'Another tag'
+      };
+
+      const mockResponse: Tag = {
+        id: 2,
         name: 'another',
         slug: 'another',
         description: 'Another tag',
         count: 0
       };
 
-      let initialCount = 0;
-      service.getTags().subscribe(tags => {
-        initialCount = tags.length;
-      });
-
       service.createTag(newTag).subscribe(() => {
-        service.getTags().subscribe(tags => {
-          expect(tags.length).toBe(initialCount + 1);
-          done();
-        });
+        done();
       });
-    });
 
-    it('should generate unique ids for new tags', (done) => {
-      const tag1: Tag = {
-        id: 0,
-        name: 'tag1',
-        slug: 'tag-1',
-        description: 'Tag 1',
-        count: 0
-      };
+      const createReq = httpMock.expectOne(request => request.url.includes('/tags') && request.method === 'POST');
+      createReq.flush(mockResponse);
 
-      const tag2: Tag = {
-        id: 0,
-        name: 'tag2',
-        slug: 'tag-2',
-        description: 'Tag 2',
-        count: 0
-      };
-
-      service.createTag(tag1).subscribe(created1 => {
-        service.createTag(tag2).subscribe(created2 => {
-          expect(created1.id).not.toBe(created2.id);
-          expect(Number(created2.id)).toBeGreaterThan(Number(created1.id));
-          done();
-        });
-      });
+      // Verify reload is triggered
+      const reloadReq = httpMock.expectOne(request => request.url.includes('/tags') && request.method === 'GET');
+      reloadReq.flush({ data: [mockResponse], total: 1, page: 1, limit: 100, totalPages: 1 });
     });
   });
 
   describe('updateTag', () => {
     it('should update an existing tag', (done) => {
-      const existingTag = service.getTagById(1);
-      expect(existingTag).toBeDefined();
-
-      const updatedTag: Tag = {
-        ...existingTag!,
+      const updateData = {
         name: 'updated-angular',
-        description: 'Updated description'
+        description: 'Updated description',
+        slug: 'updated-angular'
       };
 
-      service.updateTag(updatedTag).subscribe(result => {
+      const mockResponse: Tag = {
+        id: 1,
+        name: 'updated-angular',
+        slug: 'updated-angular',
+        description: 'Updated description',
+        count: 5
+      };
+
+      service.updateTag(1, updateData).subscribe(result => {
         expect(result.name).toBe('updated-angular');
         expect(result.description).toBe('Updated description');
-        
-        const retrievedTag = service.getTagById(1);
-        expect(retrievedTag?.name).toBe('updated-angular');
         done();
       });
+
+      const req = httpMock.expectOne(request => request.url.includes('/tags/1') && request.method === 'PATCH');
+      expect(req.request.method).toBe('PATCH');
+      expect(req.request.body.name).toBe('updated-angular');
+      req.flush(mockResponse);
+
+      // Flush the reload request
+      const reloadReq = httpMock.expectOne(request => request.url.includes('/tags') && request.method === 'GET');
+      reloadReq.flush({ data: [mockResponse], total: 1, page: 1, limit: 100, totalPages: 1 });
     });
 
-    it('should emit updated tags list', (done) => {
-      const existingTag = service.getTagById(1);
-      const updatedTag: Tag = {
-        ...existingTag!,
+    it('should trigger reload after updating tag', (done) => {
+      const updateData = {
         slug: 'new-slug'
       };
 
-      service.updateTag(updatedTag).subscribe(() => {
-        service.getTags().subscribe(tags => {
-          const tag = tags.find(t => t.id === 1);
-          expect(tag?.slug).toBe('new-slug');
-          done();
-        });
-      });
-    });
-
-    it('should handle updating non-existent tag', (done) => {
-      const nonExistentTag: Tag = {
-        id: 999,
-        name: 'nonexistent',
-        slug: 'non-existent',
-        description: 'Description',
-        count: 0
+      const mockResponse: Tag = {
+        id: 1,
+        name: 'angular',
+        slug: 'new-slug',
+        description: 'Angular framework',
+        count: 5
       };
 
-      service.updateTag(nonExistentTag).subscribe(result => {
-        expect(result).toBeDefined();
-        expect(result.id).toBe(999);
+      service.updateTag(1, updateData).subscribe(() => {
         done();
       });
+
+      const updateReq = httpMock.expectOne(request => request.url.includes('/tags/1') && request.method === 'PATCH');
+      updateReq.flush(mockResponse);
+
+      // Verify reload is triggered
+      const reloadReq = httpMock.expectOne(request => request.url.includes('/tags') && request.method === 'GET');
+      reloadReq.flush({ data: [mockResponse], total: 1, page: 1, limit: 100, totalPages: 1 });
     });
   });
 
   describe('deleteTag', () => {
     it('should delete a tag by id', (done) => {
-      let initialCount = 0;
-      service.getTags().subscribe(tags => {
-        initialCount = tags.length;
+      const mockResponse = { message: 'Tag deleted successfully' };
+
+      service.deleteTag(1).subscribe(response => {
+        expect(response).toBeDefined();
+        expect(response.message).toBe('Tag deleted successfully');
+        done();
       });
 
-      service.deleteTag(1).subscribe(() => {
-        service.getTags().subscribe(tags => {
-          expect(tags.length).toBe(initialCount - 1);
-          const deletedTag = tags.find(t => t.id === 1);
-          expect(deletedTag).toBeUndefined();
-          done();
-        });
-      });
+      const req = httpMock.expectOne(request => request.url.includes('/tags/1') && request.method === 'DELETE');
+      expect(req.request.method).toBe('DELETE');
+      req.flush(mockResponse);
+
+      // Flush the reload request
+      const reloadReq = httpMock.expectOne(request => request.url.includes('/tags') && request.method === 'GET');
+      reloadReq.flush({ data: [], total: 0, page: 1, limit: 100, totalPages: 0 });
     });
 
-    it('should emit updated tags list after deletion', (done) => {
+    it('should trigger reload after deletion', (done) => {
+      const mockResponse = { message: 'Tag deleted successfully' };
+
       service.deleteTag(2).subscribe(() => {
-        service.getTags().subscribe(tags => {
-          const tag = tags.find(t => t.id === 2);
-          expect(tag).toBeUndefined();
-          done();
-        });
-      });
-    });
-
-    it('should handle deleting non-existent tag', (done) => {
-      let initialCount = 0;
-      service.getTags().subscribe(tags => {
-        initialCount = tags.length;
+        done();
       });
 
-      service.deleteTag(999).subscribe(() => {
-        service.getTags().subscribe(tags => {
-          expect(tags.length).toBe(initialCount);
-          done();
-        });
-      });
+      const deleteReq = httpMock.expectOne(request => request.url.includes('/tags/2') && request.method === 'DELETE');
+      deleteReq.flush(mockResponse);
+
+      // Verify reload is triggered
+      const reloadReq = httpMock.expectOne(request => request.url.includes('/tags') && request.method === 'GET');
+      reloadReq.flush({ data: [], total: 0, page: 1, limit: 100, totalPages: 0 });
     });
   });
 

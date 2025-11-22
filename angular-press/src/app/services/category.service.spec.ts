@@ -215,43 +215,36 @@ describe('CategoryService', () => {
 
   describe('deleteCategory', () => {
     it('should delete a category by id', (done) => {
-      let initialCount = 0;
-      service.getCategories().subscribe(categories => {
-        initialCount = categories.length;
+      const mockResponse = { message: 'Category deleted successfully' };
+
+      service.deleteCategory(1).subscribe(response => {
+        expect(response).toBeDefined();
+        expect(response.message).toBe('Category deleted successfully');
+        done();
       });
 
-      service.deleteCategory(1).subscribe(() => {
-        service.getCategories().subscribe(categories => {
-          expect(categories.length).toBe(initialCount - 1);
-          const deletedCategory = categories.find(c => c.id === 1);
-          expect(deletedCategory).toBeUndefined();
-          done();
-        });
-      });
+      const req = httpMock.expectOne(request => request.url.includes('/categories/1') && request.method === 'DELETE');
+      expect(req.request.method).toBe('DELETE');
+      req.flush(mockResponse);
+
+      // Flush the reload request
+      const reloadReq = httpMock.expectOne(request => request.url.includes('/categories') && request.method === 'GET');
+      reloadReq.flush({ data: [], total: 0, page: 1, limit: 100, totalPages: 0 });
     });
 
-    it('should emit updated categories list after deletion', (done) => {
+    it('should trigger reload after deletion', (done) => {
+      const mockResponse = { message: 'Category deleted successfully' };
+
       service.deleteCategory(2).subscribe(() => {
-        service.getCategories().subscribe(categories => {
-          const category = categories.find(c => c.id === 2);
-          expect(category).toBeUndefined();
-          done();
-        });
-      });
-    });
-
-    it('should handle deleting non-existent category', (done) => {
-      let initialCount = 0;
-      service.getCategories().subscribe(categories => {
-        initialCount = categories.length;
+        done();
       });
 
-      service.deleteCategory(999).subscribe(() => {
-        service.getCategories().subscribe(categories => {
-          expect(categories.length).toBe(initialCount);
-          done();
-        });
-      });
+      const deleteReq = httpMock.expectOne(request => request.url.includes('/categories/2') && request.method === 'DELETE');
+      deleteReq.flush(mockResponse);
+
+      // Verify reload is triggered
+      const reloadReq = httpMock.expectOne(request => request.url.includes('/categories') && request.method === 'GET');
+      reloadReq.flush({ data: [], total: 0, page: 1, limit: 100, totalPages: 0 });
     });
   });
 
